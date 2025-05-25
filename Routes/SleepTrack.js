@@ -16,7 +16,7 @@ function createResponse(ok, message, data) {
 router.post('/addsleepentry', authTokenHandler, async (req, res) => {
     const { date, durationInHrs } = req.body;
 
-    if (!date || !duration) {
+    if (!date || !durationInHrs) {
         return res.status(400).json(createResponse(false, 'Please provide date and sleep duration'));
     }
 
@@ -62,14 +62,14 @@ router.post('/getsleepbylimit', authTokenHandler, async (req, res) => {
     } else if (limit === 'all') {
         return res.json(createResponse(true, 'All sleep entries', user.sleep));
     } else {
-
-        let date = new Date();
-        let currentDate = new Date(date.setDate(date.getDate() - parseInt(limit))).getTime();
-
-   
+        let startDate = new Date();
+        // Calculate the start date correctly for "last 'limit' days"
+        // If limit is 1, it means today. If limit is 7, it means today and the 6 previous days.
+        startDate.setDate(startDate.getDate() - parseInt(limit) + 1);
+        startDate.setHours(0, 0, 0, 0); // Set to the beginning of that day
         
         user.sleep = user.sleep.filter((item) => {
-            return new Date(item.date).getTime() >= currentDate;
+            return new Date(item.date).getTime() >= startDate.getTime();
         })
 
         return res.json(createResponse(true, `Sleep entries for the last ${limit} days`, user.sleep));
@@ -86,8 +86,12 @@ router.delete('/deletesleepentry', authTokenHandler, async (req, res) => {
     const userId = req.userId;
     const user = await User.findById({ _id: userId });
 
+    // Convert the target date string from req.body to a normalized YYYY-MM-DD string
+    const targetDateStr = new Date(date).toISOString().split('T')[0];
+    
     user.sleep = user.sleep.filter(entry => {
-        return entry.date !== date;
+        const entryDateStr = entry.date.toISOString().split('T')[0];
+        return entryDateStr !== targetDateStr; // Keep entries whose date is NOT the target date
     });
 
     await user.save();

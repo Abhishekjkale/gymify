@@ -62,13 +62,14 @@ router.post('/getstepsbylimit', authTokenHandler, async (req, res) => {
     } else if (limit === 'all') {
         return res.json(createResponse(true, 'All steps entries', user.steps));
     } else {
-        let date = new Date();
-        let currentDate = new Date(date.setDate(date.getDate() - parseInt(limit))).getTime();
-
-
+        let startDate = new Date();
+        // Calculate the start date correctly for "last 'limit' days"
+        // If limit is 1, it means today. If limit is 7, it means today and the 6 previous days.
+        startDate.setDate(startDate.getDate() - parseInt(limit) + 1);
+        startDate.setHours(0, 0, 0, 0); // Set to the beginning of that day
 
         user.steps = user.steps.filter((item) => {
-            return new Date(item.date).getTime() >= currentDate;
+            return new Date(item.date).getTime() >= startDate.getTime();
         })
 
         return res.json(createResponse(true, `Steps entries for the last ${limit} days`, user.steps));
@@ -85,7 +86,13 @@ router.delete('/deletestepentry', authTokenHandler, async (req, res) => {
     const userId = req.userId;
     const user = await User.findById({ _id: userId });
 
-    user.steps = user.steps.filter(entry => entry.date !== date);
+    // Convert the target date string from req.body to a normalized YYYY-MM-DD string
+    const targetDateStr = new Date(date).toISOString().split('T')[0];
+
+    user.steps = user.steps.filter(entry => {
+        const entryDateStr = entry.date.toISOString().split('T')[0];
+        return entryDateStr !== targetDateStr; // Keep entries whose date is NOT the target date
+    });
 
     await user.save();
     res.json(createResponse(true, 'Steps entry deleted successfully'));

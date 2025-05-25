@@ -62,12 +62,14 @@ router.post('/getweightbylimit', authTokenHandler, async (req, res) => {
     } else if (limit === 'all') {
         return res.json(createResponse(true, 'All weight entries', user.weight));
     } else {
-        let date = new Date();
-        let currentDate = new Date(date.setDate(date.getDate() - parseInt(limit))).getTime();
-
+        let startDate = new Date();
+        // Calculate the start date correctly for "last 'limit' days"
+        // If limit is 1, it means today. If limit is 7, it means today and the 6 previous days.
+        startDate.setDate(startDate.getDate() - parseInt(limit) + 1);
+        startDate.setHours(0, 0, 0, 0); // Set to the beginning of that day
  
         user.weight = user.weight.filter((item) => {
-            return new Date(item.date).getTime() >= currentDate;
+            return new Date(item.date).getTime() >= startDate.getTime();
         })
 
         return res.json(createResponse(true, `Weight entries for the last ${limit} days`, user.weight));
@@ -84,7 +86,13 @@ router.delete('/deleteweightentry', authTokenHandler, async (req, res) => {
     const userId = req.userId;
     const user = await User.findById({ _id: userId });
 
-    user.weight = user.weight.filter(entry => entry.date !== date);
+    // Convert the target date string from req.body to a normalized YYYY-MM-DD string
+    const targetDateStr = new Date(date).toISOString().split('T')[0];
+
+    user.weight = user.weight.filter(entry => {
+        const entryDateStr = entry.date.toISOString().split('T')[0];
+        return entryDateStr !== targetDateStr; // Keep entries whose date is NOT the target date
+    });
 
     await user.save();
     res.json(createResponse(true, 'Weight entry deleted successfully'));
@@ -96,8 +104,13 @@ router.get('/getusergoalweight', authTokenHandler, async (req, res) => {
     const userId = req.userId;
     const user = await User.findById({ _id: userId });
 
-    const currentWeight = user.weight.length > 0 ? user.weight[user.weight.length - 1].weight : null;
-    const goalWeight = 22 * ((user.height[user.height.length - 1].height / 100) ** 2);
+    const currentWeight = (user.weight && user.weight.length > 0) ? user.weight[user.weight.length - 1].weight : null;
+    
+    let goalWeight = null;
+    if (user.height && user.height.length > 0 && user.height[user.height.length - 1].height) {
+        goalWeight = 22 * ((user.height[user.height.length - 1].height / 100) ** 2);
+        goalWeight = parseFloat(goalWeight.toFixed(2)); // Round to 2 decimal places
+    }
 
     res.json(createResponse(true, 'User goal weight information', { currentWeight, goalWeight }));
 });
