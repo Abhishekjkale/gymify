@@ -1,7 +1,6 @@
 const express = require('express');
 const app = express();
 
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const PORT = 8000;
 const cookieParser = require('cookie-parser');
@@ -22,7 +21,8 @@ const reportRoutes = require('./Routes/Report');
 require('dotenv').config();
 require('./db')
 
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const allowedOrigins = ['http://localhost:3000']; // Add more origins as needed
 
 app.use(

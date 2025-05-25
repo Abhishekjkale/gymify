@@ -3,7 +3,6 @@ const router = express.Router();
 const authTokenHandler = require('../Middlewares/checkAuthToken');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../Middlewares/errorMiddleware');
-const request = require('request');
 const User = require('../Models/UserSchema');
 require('dotenv').config();
 

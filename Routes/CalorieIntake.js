@@ -3,7 +3,7 @@ const router = express.Router();
 const authTokenHandler = require('../Middlewares/checkAuthToken');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../Middlewares/errorMiddleware');
-const request = require('request');
+const axios = require('axios');
 const User = require('../Models/UserSchema');
 require('dotenv').config();
 
@@ -44,47 +44,43 @@ router.post('/addcalorieintake', authTokenHandler, async (req, res) => {
     }
 
     var query = item;
-    request.get({
-        url: 'https://api.api-ninjas.com/v1/nutrition?query=' + query,
-        headers: {
-            'X-Api-Key': process.env.NUTRITION_API_KEY,
-        },
-    }, async function (error, response, body) {
-        if (error) return console.error('Request failed:', error);
-        else if (response.statusCode != 200) return console.error('Error:', response.statusCode, body.toString('utf8'));
-        else {
-            // body :[ {
-            //     "name": "rice",
-            //     "calories": 127.4,
-            //     "serving_size_g": 100,
-            //     "fat_total_g": 0.3,
-            //     "fat_saturated_g": 0.1,
-            //     "protein_g": 2.7,
-            //     "sodium_mg": 1,
-            //     "potassium_mg": 42,
-            //     "cholesterol_mg": 0,
-            //     "carbohydrates_total_g": 28.4,
-            //     "fiber_g": 0.4,
-            //     "sugar_g": 0.1
-            // }]
+    try {
+        const nutritionAPIResponse = await axios.get('https://api.api-ninjas.com/v1/nutrition', {
+            params: { query: query }, // Pass query as a param for axios
+            headers: { 'X-Api-Key': process.env.NUTRITION_API_KEY }
+        });
 
-            body = JSON.parse(body);
-            let calorieIntake = (body[0].calories / body[0].serving_size_g) * parseInt(qtyingrams);
-            const userId = req.userId;
-            const user = await User.findOne({ _id: userId });
-            user.calorieIntake.push({
-                item,
-                date: new Date(date),
-                quantity,
-                quantitytype,
-                calorieIntake: parseInt(calorieIntake)
-            })
+        // axios throws an error for non-2xx status codes, so no need to check response.statusCode != 200 explicitly
+        // response.data is already parsed if the content type is application/json
+        const nutritionData = nutritionAPIResponse.data; 
+        
+        // Original logic using nutritionData (which was 'body' before)
+        let calorieIntake = (nutritionData[0].calories / nutritionData[0].serving_size_g) * parseInt(qtyingrams);
+        const userId = req.userId; // Assuming req.userId is available here
+        const user = await User.findOne({ _id: userId });
+        user.calorieIntake.push({
+            item,
+            date: new Date(date),
+            quantity,
+            quantitytype,
+            calorieIntake: parseInt(calorieIntake)
+        });
 
-            await user.save();
-            res.json(createResponse(true, 'Calorie intake added successfully'));
+        await user.save();
+        res.json(createResponse(true, 'Calorie intake added successfully'));
+
+    } catch (error) {
+        console.error('Request to nutrition API failed:', error.message);
+        // If error.response exists, it means the server responded with a status code outside the 2xx range
+        if (error.response) {
+            console.error('Error Response Data:', error.response.data);
+            console.error('Error Response Status:', error.response.status);
+            return res.status(error.response.status).json(createResponse(false, `Nutrition API request failed: ${error.response.data.message || error.message}`));
         }
-    });
-
+        // For other errors (network issues, etc.)
+        // Consider passing to an error middleware if you have one: next(error);
+        return res.status(500).json(createResponse(false, 'Failed to fetch nutrition data due to an internal error.'));
+    }
 })
 router.post('/getcalorieintakebydate', authTokenHandler, async (req, res) => {
     const { date } = req.body;

@@ -1,0 +1,30 @@
+# Dependencies
+/node_modules
+/npm-debug.log*
+/yarn-debug.log*
+/yarn-error.log*
+/package-lock.json # Often good to commit this, but for now, to avoid issues with the tool, let's ignore it.
+                    # If the user wants to commit it, they can remove this line later.
+
+# Environment variables
+.env
+.env.test
+.env.production
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lcov.info
+*.swp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
